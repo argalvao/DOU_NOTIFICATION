@@ -36,7 +36,7 @@ def update_possibilities(nome, fk_person_id, cursor):
     cursor.execute(sql_delete, (fk_person_id,))
     create_possibilities(nome, fk_person_id, cursor)
 
-def create_person(nome, telefone=None, email=None, password=None):
+def create_person(nome, telefone, email, password):
     try:
         with sqlite3.connect(DB_PATH) as conexao:
             cursor = conexao.cursor()
@@ -97,7 +97,7 @@ def edit_person(id_person, nome=None, telefone=None, email=None, password=None):
             if not updates:
                 if password is not None:
                     conexao.commit()
-                    print(f"Senha da pessoa com ID {id_person} atualizada com sucesso.")
+                    print(f"Senha de {nome} atualizada com sucesso.")
                     return True
                 print("Nenhum campo para atualizar.")
                 return False
@@ -109,10 +109,10 @@ def edit_person(id_person, nome=None, telefone=None, email=None, password=None):
             conexao.commit()
                     
             if cursor.rowcount > 0:
-                print(f"Pessoa com ID {id_person} atualizada com sucesso.")
+                print(f"'{nome}' atualizada com sucesso.")
                 return True
             else:
-                print(f"Nenhuma pessoa encontrada com ID {id_person}.")
+                print(f"Nenhuma pessoa encontrada com o nome: '{nome}'.")
                 return False
 
     except sqlite3.Error as erro:
@@ -219,6 +219,10 @@ def search_dou(id_person):
         for inscricao in inscricoes:
             print(f"  Buscando por inscrição: '{inscricao}'...")
             for item in consult_competition_matricula(inscricao):
+                texto_item = (item.get('title', '') + ' ' + item.get('content', '')).lower()
+                nome_encontrado = any(v.lower() in texto_item for v in variacoes)
+                if not nome_encontrado:
+                    continue
                 chave = (item.get('title', ''), item.get('publicationDate', ''))
                 if chave not in vistos:
                     vistos.add(chave)
