@@ -1,11 +1,15 @@
 import os
 from model import *
 
+# Sessão atual
 session = None
 
+# Menu principal
 while True:
     os.system('clear')
+
     print(f"###### NOTIFICAÇÕES DO DOU ######")
+
     if session:
         print(f"Usuário logado: {session['nome']}\n")
         print(f"1 - CADASTRO\n2 - EDIÇÃO\n3 - CONSULTA\n4 - EXCLUSÃO\n5 - LOGOUT\n6 - SAIR\n")
@@ -19,8 +23,10 @@ while True:
     match option:
         case "1":
             new_person()
+
         case "2":
             update_person()
+
         case "3":
             if not session:
                 print("Acesso negado. Faça login para acessar a consulta.")
@@ -39,17 +45,21 @@ while True:
                         continue
                     case _:
                         print("Opção inválida. Tente novamente.")
+
         case "4":
             remove_person()
+
         case "5":
             if session:
                 print(f"Até logo, {session['nome']}!")
                 session = None
             else:
                 session = login()
+
         case "6":
             print("Encerrando o sistema. Até logo!")
             break
+
         case _:
             print("Opção inválida. Tente novamente.")
 
