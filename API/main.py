@@ -4,9 +4,13 @@ from model import *
 # Sessão atual
 session = None
 
+
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
 # Menu principal
 while True:
-    os.system('clear')
+    clear_screen()
 
     print(f"###### NOTIFICAÇÕES DO DOU ######")
 
@@ -18,7 +22,7 @@ while True:
         print(f"1 - CADASTRO\n2 - EDIÇÃO\n3 - CONSULTA\n4 - EXCLUSÃO\n5 - LOGIN\n6 - SAIR\n")
 
     option = input("Selecione uma opção para continuar: ")
-    os.system('clear')
+    clear_screen()
 
     match option:
         case "1":
@@ -31,11 +35,11 @@ while True:
             if not session:
                 print("Acesso negado. Faça login para acessar a consulta.")
             else:
-                os.system('clear')
+                clear_screen()
                 print(f"###### MATRÍCULAS DE CONCURSOS ######\n\n")
                 print(f"1 - NOVA MATRÍCULA\n2 - BUSCAR SITUAÇÃO\n3 - VOLTAR\n")
                 sub_option = input("Selecione uma opção para continuar: ")
-                os.system('clear')
+                clear_screen()
                 match sub_option:
                     case "1":
                         new_enrollment(session['id_person'])
