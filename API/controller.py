@@ -179,7 +179,7 @@ def delete_person(id_person):
                 return False
 
     except sqlite3.Error as erro:
-        print(f"Erro ao deletar pessoa com ID {id_person}: {erro}")
+        print(f"Erro ao deletar: {erro}")
         return False
 
 def create_enrollment(id_person, subscrition):
@@ -194,7 +194,7 @@ def create_enrollment(id_person, subscrition):
             '''
             cursor.execute(sql, (id_person, subscrition))
             conexao.commit()
-            print(f"Pessoa com ID {id_person} matriculada no curso {subscrition}.")
+            print(f"Matricula inserida para busca com inscrição nº {subscrition}.")
 
     except sqlite3.Error as erro:
         print(f"Erro ao matricular pessoa com ID {id_person} inscrição {subscrition}: {erro}")
