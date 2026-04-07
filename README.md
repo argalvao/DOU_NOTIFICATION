@@ -7,7 +7,7 @@ Universidade Estadual de Feira de Santana (UEFS)
 
 ## Descrição
 
-Sistema de monitoramento e notificação de publicações no **Diário Oficial da União (DOU)**. O usuário cadastra seu nome e número de inscrição em concursos públicos, e o sistema realiza buscas automatizadas no portal oficial `www.in.gov.br`, coletando e armazenando as publicações relevantes.
+Sistema de monitoramento e notificação de publicações no **Diário Oficial da União (DOU)**. O usuário cadastra seu nome e números de inscrição em concursos públicos, e o sistema realiza buscas automatizadas no portal oficial `www.in.gov.br`, coletando e armazenando publicações relevantes tanto pela **API/pesquisa web do DOU** quanto pelos **arquivos XML extraídos dos pacotes mensais oficiais**.
 
 ---
 
@@ -18,10 +18,11 @@ DOU_NOTIFICATION/
 ├── API/
 │   ├── main.py         # Ponto de entrada — menu CLI com loop
 │   ├── model.py        # Camada de apresentação (coleta de inputs)
-│   ├── controller.py   # Lógica de negócio e acesso ao banco
-│   └── service.py      # Crawler — requisições e parsing do DOU
+│   ├── controller.py   # Lógica de negócio, agendamento e acesso ao banco
+│   └── service.py      # Crawler e download dos pacotes oficiais do DOU
 └── DB/
-    └── database.db     # Banco de dados SQLite
+    ├── database.db     # Banco de dados SQLite
+    └── DOWNLOAD/       # ZIPs mensais e XMLs extraídos do DOU
 ```
 
 ---
@@ -30,8 +31,8 @@ DOU_NOTIFICATION/
 
 ```
 main.py  →  model.py  →  controller.py  →  service.py  →  DOU (in.gov.br)
-                               ↓
-                         SQLite (database.db)
+                     ↓                    ↓
+                SQLite (database.db)   DB/DOWNLOAD (ZIP/XML)
 ```
 
 ---
@@ -42,9 +43,9 @@ main.py  →  model.py  →  controller.py  →  service.py  →  DOU (in.gov.br
 |---|---|
 | `person` | Dados do usuário (nome, telefone, e-mail) |
 | `possibilities` | Variações do nome para busca (original, maiúsculo, minúsculo, sem acentos, etc.) |
-| `user_autentication` | Credenciais de login (usuário = e-mail, senha em SHA-256) |
+| `user` | Credenciais de login (usuário = e-mail, senha em SHA-256) |
 | `enrollment` | Inscrições em concursos públicos vinculadas ao usuário |
-| `result` | Publicações do DOU coletadas pelo crawler |
+| `result` | Publicações do DOU coletadas via pesquisa web e/ou XML |
 
 ---
 
@@ -53,19 +54,37 @@ main.py  →  model.py  →  controller.py  →  service.py  →  DOU (in.gov.br
 - **Cadastro** de pessoa com nome, telefone, e-mail e senha
 - **Login/Logout** com autenticação por hash SHA-256
 - **Edição** de dados cadastrais (incluindo senha)
-- **Exclusão** em cascata (person, possibilities, user_autentication)
+- **Exclusão** em cascata (person, possibilities, user)
 - **Matrícula** em concurso público por número de inscrição
-- **Busca no DOU**: realiza uma requisição para cada variação de nome e por inscrição, deduplica os resultados e armazena na tabela `result`
+- **Busca no DOU** via portal web: realiza uma requisição para cada variação de nome e por inscrição, deduplica os resultados e armazena na tabela `result`
+- **Download automático da Seção 2 do DOU** para [DB/DOWNLOAD](DB/DOWNLOAD), sempre às 05:00
+- **Extração automática dos arquivos ZIP** baixados para pastas com os XMLs do mês correspondente
+- **Busca complementar nos XMLs extraídos** para todos os usuários cadastrados
+- **Rotina automática diária em background** para download, extração e processamento dos resultados
 
 ---
 
-## Crawler (service.py)
+## Coleta de Dados
+
+### Pesquisa web do DOU (`service.py`)
 
 O crawler acessa o portal `www.in.gov.br` e extrai os resultados embutidos na página como JSON no elemento `#BuscaDouPortlet_params`, utilizando:
 
 - **`requests`** — requisições HTTP com headers de navegador para evitar bloqueios
 - **`BeautifulSoup`** — parsing do HTML da resposta
 - **Busca por frase exata** — nomes compostos são envolvidos em aspas (`"Abel Ramalho Galvão"`) para evitar resultados irrelevantes
+
+### Base mensal em formato aberto (`service.py` + `controller.py`)
+
+Além da pesquisa web, o sistema também consome a base mensal oficial do DOU em formato aberto:
+
+- acessa a página oficial de dados abertos do DOU;
+- baixa o arquivo `S02MMYYYY.zip` da **Seção 2**;
+- armazena o ZIP em [DB/DOWNLOAD](DB/DOWNLOAD);
+- extrai automaticamente os arquivos XML;
+- lê os XMLs e procura ocorrências dos nomes e inscrições cadastrados.
+
+Observação: a Imprensa Nacional publica esses pacotes mensalmente, normalmente na **primeira terça-feira do mês**, contendo as edições do **mês anterior**. Por isso, o arquivo do mês vigente pode ainda não estar disponível em alguns dias.
 
 Dados extraídos por publicação:
 
@@ -77,6 +96,24 @@ Dados extraídos por publicação:
 | `edition` | Número da edição |
 | `section` | Seção do DOU (DO1, DO2, DO3) |
 | `href` | Link direto para a publicação |
+| `source` | Origem do dado (`xml`, quando vier da base extraída) |
+| `xmlPath` | Caminho relativo do XML processado, quando aplicável |
+
+---
+
+## Rotina Automática
+
+Ao iniciar o sistema, uma thread em background é criada para executar diariamente a rotina automática do DOU.
+
+Fluxo da rotina:
+
+1. aguarda até **05:00**;
+2. tenta baixar o pacote mensal da **Seção 2**;
+3. extrai o conteúdo do ZIP, quando disponível;
+4. executa `search_dou_all()` para todos os usuários cadastrados;
+5. salva no banco apenas os resultados ainda não armazenados.
+
+As buscas automáticas usam logs resumidos para evitar poluição no terminal.
 
 ---
 
@@ -84,7 +121,7 @@ Dados extraídos por publicação:
 
 | Parte | Descrição | Status |
 |---|---|---|
-| **Parte 1** | Crawler — coleta de dados estruturados do DOU | ✅ Implementado |
+| **Parte 1** | Crawler, download mensal, extração XML e coleta estruturada do DOU | ✅ Implementado |
 | **Parte 2** | Armazenamento e API REST para recuperação dos dados | 🔜 Pendente |
 | **Parte 3** | Interface Web responsiva consumindo a API | 🔜 Pendente |
 
@@ -129,6 +166,9 @@ python3 main.py
 | `beautifulsoup4` | Parsing do HTML da resposta |
 | `hashlib` | Hash SHA-256 das senhas |
 | `unicodedata` | Normalização de acentos para variações de nome |
+| `threading` | Rotina automática em background |
+| `zipfile` | Extração dos pacotes ZIP do DOU |
+| `xml.etree.ElementTree` | Leitura dos XMLs extraídos |
 
 ---
 
