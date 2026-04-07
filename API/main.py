@@ -4,6 +4,9 @@ from model import *
 # Sessão atual
 session = None
 
+# Inicia o agendamento diário do download do DOU em background
+get_dou()
+
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
