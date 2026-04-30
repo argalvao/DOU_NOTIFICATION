@@ -16,10 +16,12 @@ Sistema de monitoramento e notificação de publicações no **Diário Oficial d
 ```
 DOU_NOTIFICATION/
 ├── API/
+│   ├── app.py          # API REST em Flask
 │   ├── main.py         # Ponto de entrada — menu CLI com loop
 │   ├── model.py        # Camada de apresentação (coleta de inputs)
 │   ├── controller.py   # Lógica de negócio, agendamento e acesso ao banco
 │   └── service.py      # Crawler e download dos pacotes oficiais do DOU
+├── requirements.txt    # Dependências do projeto
 └── DB/
     ├── database.db     # Banco de dados SQLite
     └── DOWNLOAD/       # ZIPs mensais e XMLs extraídos do DOU
@@ -122,8 +124,48 @@ As buscas automáticas usam logs resumidos para evitar poluição no terminal.
 | Parte | Descrição | Status |
 |---|---|---|
 | **Parte 1** | Crawler, download mensal, extração XML e coleta estruturada do DOU | ✅ Implementado |
-| **Parte 2** | Armazenamento e API REST para recuperação dos dados | 🔜 Pendente |
+| **Parte 2** | Armazenamento e API REST para recuperação dos dados em JSON | ✅ Implementado localmente |
 | **Parte 3** | Interface Web responsiva consumindo a API | 🔜 Pendente |
+
+### Endpoints da API REST
+
+Ao lado do menu em terminal, o projeto possui uma API HTTP que retorna JSON. Quando `main.py` é inicializado, a API também é iniciada automaticamente em background na porta `8000`, se ela ainda não estiver em execução.
+
+Arquivo principal da API: [API/app.py](API/app.py)
+
+Endpoints disponíveis:
+
+- `GET /api/health`
+- `GET /api/persons`
+- `GET /api/persons/<id>`
+- `POST /api/persons`
+- `PUT /api/persons/<id>`
+- `DELETE /api/persons/<id>`
+- `POST /api/login`
+- `GET /api/persons/<id>/enrollments`
+- `POST /api/persons/<id>/enrollments`
+- `GET /api/persons/<id>/results?query=&source=`
+- `POST /api/persons/<id>/search`
+
+Exemplo de corpo JSON para criar pessoa:
+
+```json
+{
+    "nome": "Abel Ramalho Galvão",
+    "telefone": "75999999999",
+    "email": "abel@email.com",
+    "password": "123456"
+}
+```
+
+Exemplo de corpo JSON para login:
+
+```json
+{
+    "user": "abel@email.com",
+    "password": "123456"
+}
+```
 
 ---
 
@@ -132,14 +174,37 @@ As buscas automáticas usam logs resumidos para evitar poluição no terminal.
 ### Pré-requisitos
 
 ```bash
-pip install requests beautifulsoup4
+cd DOU_NOTIFICATION
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+Ou, se preferir usar o Python global já configurado no sistema:
+
+```bash
+pip install -r requirements.txt
 ```
 
 ### Execução
 
 ```bash
 cd DOU_NOTIFICATION/API
-python3 main.py
+../.venv/bin/python main.py
+```
+
+Ao iniciar o menu, a seguinte mensagem será exibida no topo da tela:
+
+```text
+API disponível em http://127.0.0.1:8000
+```
+
+Isso indica que a API REST foi iniciada automaticamente em background pelo próprio `main.py`.
+
+### Execução da API REST
+
+```bash
+cd DOU_NOTIFICATION
+.venv/bin/python API/app.py
 ```
 
 ### Menu principal
@@ -161,6 +226,7 @@ python3 main.py
 
 | Biblioteca | Uso |
 |---|---|
+| `Flask` | API REST HTTP com retorno em JSON |
 | `sqlite3` | Banco de dados (built-in Python) |
 | `requests` | Requisições HTTP ao portal do DOU |
 | `beautifulsoup4` | Parsing do HTML da resposta |

@@ -1,8 +1,13 @@
 import os
+from app import run_api_background
 from model import *
 
 # Sessão atual
 session = None
+
+initialize_database()
+
+run_api_background()
 
 # Inicia o agendamento diário do download do DOU em background
 get_dou()
@@ -16,6 +21,7 @@ while True:
     clear_screen()
 
     print(f"###### NOTIFICAÇÕES DO DOU ######")
+    print("API disponível em http://127.0.0.1:8000\n")
 
     if session:
         print(f"Usuário logado: {session['nome']}\n")

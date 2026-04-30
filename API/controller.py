@@ -16,6 +16,44 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / 'DB' / 'database.db'
 DOWNLOAD_PATH = BASE_DIR / 'DB' / 'DOWNLOAD'
 
+SCHEMA_SQL = '''
+CREATE TABLE IF NOT EXISTS person (
+    id_person INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    telefone TEXT,
+    email TEXT
+);
+
+CREATE TABLE IF NOT EXISTS enrollment (
+    id_enrollment INTEGER PRIMARY KEY AUTOINCREMENT,
+    fk_person_id INTEGER NOT NULL,
+    subscription TEXT,
+    FOREIGN KEY (fk_person_id) REFERENCES person (id_person) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS possibilities (
+    id_possibilities INTEGER PRIMARY KEY AUTOINCREMENT,
+    fk_id_person INTEGER NOT NULL,
+    nome_variacao TEXT,
+    FOREIGN KEY (fk_id_person) REFERENCES person (id_person) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS user (
+    id_autentication INTEGER PRIMARY KEY AUTOINCREMENT,
+    user TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    fk_id_person INTEGER NOT NULL,
+    FOREIGN KEY (fk_id_person) REFERENCES person (id_person) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS result (
+    id_result INTEGER PRIMARY KEY AUTOINCREMENT,
+    dou_result TEXT,
+    fk_person_id INTEGER NOT NULL,
+    FOREIGN KEY (fk_person_id) REFERENCES person (id_person) ON DELETE CASCADE
+);
+'''
+
 # Controle da thread de download diário do DOU
 _dou_thread = None
 
@@ -26,7 +64,17 @@ _dou_xml_cache = {}
 def get_connection():
     # Abre conexão com o banco
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    return sqlite3.connect(DB_PATH)
+    connection = sqlite3.connect(DB_PATH)
+    connection.row_factory = sqlite3.Row
+    connection.execute('PRAGMA foreign_keys = ON')
+    return connection
+
+
+def initialize_database():
+    # Garante que o schema do banco exista
+    with get_connection() as conexao:
+        conexao.executescript(SCHEMA_SQL)
+        conexao.commit()
 
 
 def _seconds_until_next_run(target_hour=5, target_minute=0):
@@ -247,6 +295,155 @@ def strip_html(text):
     # Remove tags HTML de textos vindos do XML do DOU
     return BeautifulSoup(text, "html.parser").get_text(separator=" ", strip=True)
 
+
+def _serialize_person_row(row):
+    if not row:
+        return None
+
+    return {
+        "id_person": row["id_person"],
+        "nome": row["nome"],
+        "telefone": row["telefone"],
+        "email": row["email"],
+    }
+
+
+def list_people():
+    # Lista todas as pessoas cadastradas
+    try:
+        with get_connection() as conexao:
+            cursor = conexao.cursor()
+            cursor.execute(
+                "SELECT id_person, nome, telefone, email FROM person ORDER BY id_person"
+            )
+            return [_serialize_person_row(row) for row in cursor.fetchall()]
+    except sqlite3.Error as erro:
+        print(f"Erro ao listar pessoas: {erro}")
+        return []
+
+
+def get_person_by_id(id_person):
+    # Busca uma pessoa pelo ID
+    try:
+        with get_connection() as conexao:
+            cursor = conexao.cursor()
+            cursor.execute(
+                "SELECT id_person, nome, telefone, email FROM person WHERE id_person = ?",
+                (id_person,)
+            )
+            return _serialize_person_row(cursor.fetchone())
+    except sqlite3.Error as erro:
+        print(f"Erro ao buscar pessoa com ID {id_person}: {erro}")
+        return None
+
+
+def list_enrollments_by_person(id_person):
+    # Lista as inscrições vinculadas a uma pessoa
+    try:
+        with get_connection() as conexao:
+            cursor = conexao.cursor()
+            cursor.execute(
+                '''
+                    SELECT id_enrollment, fk_person_id, subscription
+                    FROM enrollment
+                    WHERE fk_person_id = ?
+                    ORDER BY id_enrollment
+                ''',
+                (id_person,)
+            )
+            return [
+                {
+                    "id_enrollment": row["id_enrollment"],
+                    "fk_person_id": row["fk_person_id"],
+                    "subscription": row["subscription"],
+                }
+                for row in cursor.fetchall()
+            ]
+    except sqlite3.Error as erro:
+        print(f"Erro ao listar inscrições da pessoa {id_person}: {erro}")
+        return []
+
+
+def list_results_by_person(id_person, query=None, source=None):
+    # Lista resultados persistidos do DOU para uma pessoa
+    try:
+        with get_connection() as conexao:
+            cursor = conexao.cursor()
+            cursor.execute(
+                '''
+                    SELECT id_result, dou_result
+                    FROM result
+                    WHERE fk_person_id = ?
+                    ORDER BY id_result DESC
+                ''',
+                (id_person,)
+            )
+
+            items = []
+            query_lower = query.lower() if query else None
+            source_lower = source.lower() if source else None
+
+            for row in cursor.fetchall():
+                try:
+                    payload = json.loads(row["dou_result"]) if row["dou_result"] else {}
+                except json.JSONDecodeError:
+                    payload = {"raw": row["dou_result"]}
+
+                if source_lower and payload.get("source", "web").lower() != source_lower:
+                    continue
+
+                if query_lower:
+                    haystack = " ".join([
+                        str(payload.get("title", "")),
+                        str(payload.get("content", "")),
+                        str(payload.get("publicationDate", "")),
+                        str(payload.get("section", "")),
+                    ]).lower()
+                    if query_lower not in haystack:
+                        continue
+
+                items.append({
+                    "id_result": row["id_result"],
+                    **payload,
+                })
+
+            return items
+    except sqlite3.Error as erro:
+        print(f"Erro ao listar resultados da pessoa {id_person}: {erro}")
+        return []
+
+
+def email_exists(email, exclude_person_id=None):
+    # Verifica se já existe um usuário com o email informado
+    try:
+        with get_connection() as conexao:
+            cursor = conexao.cursor()
+
+            if exclude_person_id is None:
+                cursor.execute("SELECT 1 FROM user WHERE LOWER(user) = LOWER(?)", (email,))
+            else:
+                cursor.execute(
+                    '''
+                        SELECT 1
+                        FROM user
+                        WHERE LOWER(user) = LOWER(?) AND fk_id_person <> ?
+                    ''',
+                    (email, exclude_person_id)
+                )
+
+            return cursor.fetchone() is not None
+    except sqlite3.Error as erro:
+        print(f"Erro ao verificar email '{email}': {erro}")
+        return False
+
+
+def update_user_email(id_person, email, cursor):
+    # Mantém a tabela de autenticação sincronizada com o email da pessoa
+    cursor.execute(
+        "UPDATE user SET user = ? WHERE fk_id_person = ?",
+        (email, id_person)
+    )
+
 def create_possibilities(nome, fk_person_id, cursor):
     # Cria variações do nome para busca
 
@@ -301,6 +498,12 @@ def create_person(nome, telefone, email, password):
 
             conexao.commit()
             print(f"'{nome}' cadastrado(a) com ID {new_id}.")
+            return {
+                "id_person": new_id,
+                "nome": nome,
+                "telefone": telefone,
+                "email": email,
+            }
 
     except sqlite3.Error as erro:
         print(f"Erro ao cadastrar '{nome}': {erro}")
@@ -325,6 +528,7 @@ def edit_person(id_person, nome=None, telefone=None, email=None, password=None):
             if email is not None:
                 updates.append("email = ?")
                 params.append(email)
+                update_user_email(id_person, email, cursor)
 
             if password is not None:
                 hashed = hashlib.sha256(password.encode()).hexdigest()
@@ -421,9 +625,15 @@ def create_enrollment(id_person, subscrition):
             cursor.execute(sql, (id_person, subscrition))
             conexao.commit()
             print(f"Matricula inserida para busca com inscrição nº {subscrition}.")
+            return {
+                "id_enrollment": cursor.lastrowid,
+                "fk_person_id": id_person,
+                "subscription": subscrition,
+            }
 
     except sqlite3.Error as erro:
         print(f"Erro ao matricular pessoa com ID {id_person} inscrição {subscrition}: {erro}")
+        return None
 
 def search_dou(id_person, verbose=True, extracted_items=None):
     # Busca resultados no DOU
