@@ -124,7 +124,7 @@ As buscas automáticas usam logs resumidos para evitar poluição no terminal.
 | Parte | Descrição | Status |
 |---|---|---|
 | **Parte 1** | Crawler, download mensal, extração XML e coleta estruturada do DOU | ✅ Implementado |
-| **Parte 2** | Armazenamento e API REST para recuperação dos dados em JSON | ✅ Implementado localmente |
+| **Parte 2** | Armazenamento e API REST para recuperação dos dados em JSON | ✅ Implementado |
 | **Parte 3** | Interface Web responsiva consumindo a API | 🔜 Pendente |
 
 ### Endpoints da API REST
