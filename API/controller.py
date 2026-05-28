@@ -12,6 +12,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from service import *
 from email_service import send_results_notification
+from whatsapp_service import send_whatsapp_notification
 
 # Caminhos — no Vercel o filesystem é somente-leitura exceto /tmp
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -768,19 +769,27 @@ def search_dou(id_person, verbose=True, extracted_items=None, is_manual=None):
                     with get_connection() as conexao:
                         cursor = conexao.cursor()
                         cursor.execute(
-                            "SELECT p.email, p.nome FROM person p WHERE p.id_person = ?",
+                            "SELECT p.email, p.nome, p.telefone FROM person p WHERE p.id_person = ?",
                             (id_person,)
                         )
                         row = cursor.fetchone()
-                    if row and row[0]:
-                        send_results_notification(
-                            to_email=row[0],
-                            nome=row[1],
-                            new_items=itens_email,
-                            is_manual=manual,
-                        )
+                    if row:
+                        if row[0]:
+                            send_results_notification(
+                                to_email=row[0],
+                                nome=row[1],
+                                new_items=itens_email,
+                                is_manual=manual,
+                            )
+                        if row[2]:
+                            send_whatsapp_notification(
+                                telefone=row[2],
+                                nome=row[1],
+                                items=itens_email,
+                                is_manual=manual,
+                            )
                 except Exception as exc:
-                    print(f"[EMAIL] Erro ao preparar notificação: {exc}")
+                    print(f"[NOTIFY] Erro ao preparar notificação: {exc}")
 
     except sqlite3.Error as erro:
         print(f"Erro ao buscar no DOU: {erro}")
