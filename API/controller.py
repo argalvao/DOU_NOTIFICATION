@@ -685,7 +685,7 @@ def edit_person(id_person, nome=None, telefone=None, email=None, password=None):
             params.append(id_person)
             sql = f"UPDATE person SET {', '.join(updates)} WHERE id_person = ?"
 
-            cursor.execute(sql, params)
+            cursor.execute(sql, tuple(params))
             conexao.commit()
 
             if cursor.rowcount > 0:
