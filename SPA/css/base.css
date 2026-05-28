@@ -1,0 +1,80 @@
+/* ============================================================
+   BASE – Tokens, Reset, Tipografia, Animações
+   ============================================================ */
+
+:root {
+  --primary:       #1351B4;
+  --primary-dark:  #0D3F91;
+  --primary-light: #2670E8;
+  --secondary:     #168821;
+  --secondary-dark:#0D5C17;
+  --accent:        #FFCD07;
+  --danger:        #E52207;
+
+  --bg:            #F0F4FB;
+  --bg-card:       #FFFFFF;
+  --bg-nav:        #FFFFFF;
+  --border:        #D9E1EE;
+  --border-light:  #EEF2FA;
+
+  --text:          #1B1B1B;
+  --text-muted:    #5C6B8C;
+  --text-light:    #8898B5;
+
+  --radius:        10px;
+  --radius-lg:     16px;
+  --radius-full:   9999px;
+
+  --shadow-sm:     0 1px 3px rgba(0,0,0,.08);
+  --shadow:        0 4px 16px rgba(19,81,180,.10);
+  --shadow-lg:     0 8px 32px rgba(19,81,180,.14);
+
+  --transition:    .2s ease;
+
+  --nav-h:         64px;
+  --content-max:   1080px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img, svg { display: block; max-width: 100%; }
+ul { list-style: none; }
+button { cursor: pointer; font-family: inherit; }
+
+h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); line-height: 1.2; font-weight: 800; }
+h2 { font-size: clamp(1.3rem, 2.5vw, 1.9rem); font-weight: 700; }
+h3 { font-size: 1.1rem; font-weight: 600; }
+p  { color: var(--text-muted); }
+em { color: var(--primary-light); font-style: normal; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(60px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeOut {
+  to { opacity: 0; transform: translateX(60px); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

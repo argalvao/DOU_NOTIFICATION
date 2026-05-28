@@ -1,0 +1,8 @@
+/* ============================================================
+   DOU NOTIFICAÇÕES – Ponto de entrada dos estilos
+   ============================================================ */
+
+@import './base.css';
+@import './layout.css';
+@import './components.css';
+@import './pages.css';

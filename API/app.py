@@ -1,12 +1,14 @@
 import os
 import socket
 import threading
+from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 
 from controller import (
     create_enrollment,
     create_person,
+    delete_enrollment,
     delete_person,
     edit_person,
     email_exists,
@@ -20,6 +22,8 @@ from controller import (
     search_dou,
 )
 
+
+SPA_DIR = Path(__file__).resolve().parent.parent / 'SPA'
 
 app = Flask(__name__)
 initialize_database()
@@ -52,6 +56,24 @@ def ensure_person_exists(person_id):
         return None, json_error("Pessoa não encontrada.", 404)
     return person, None
 
+
+# ── SPA ──────────────────────────────────────────────────────────────────
+
+@app.get('/')
+def serve_index():
+    return send_from_directory(SPA_DIR, 'index.html')
+
+
+@app.get('/<path:path>')
+def serve_spa(path):
+    """Serve arquivos estáticos da SPA; qualquer rota desconhecida retorna index.html."""
+    target = SPA_DIR / path
+    if target.exists() and target.is_file():
+        return send_from_directory(SPA_DIR, path)
+    return send_from_directory(SPA_DIR, 'index.html')
+
+
+# ── API ───────────────────────────────────────────────────────────────────
 
 @app.get('/api/health')
 def health_check():
@@ -205,6 +227,19 @@ def post_enrollment(person_id):
         return json_error("Não foi possível cadastrar a inscrição.", 500)
 
     return jsonify(enrollment), 201
+
+
+@app.delete('/api/persons/<int:person_id>/enrollments/<int:enrollment_id>')
+def remove_enrollment(person_id, enrollment_id):
+    _, error = ensure_person_exists(person_id)
+    if error:
+        return error
+
+    deleted = delete_enrollment(enrollment_id, person_id)
+    if not deleted:
+        return json_error("Inscrição não encontrada.", 404)
+
+    return jsonify({"message": "Inscrição removida com sucesso."})
 
 
 @app.get('/api/persons/<int:person_id>/results')

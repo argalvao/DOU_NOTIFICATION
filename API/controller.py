@@ -612,6 +612,25 @@ def delete_person(id_person):
         print(f"Erro ao deletar: {erro}")
         return False
 
+def delete_enrollment(id_enrollment, id_person):
+    # Remove uma inscrição garantindo que pertence à pessoa
+    try:
+        with get_connection() as conexao:
+            cursor = conexao.cursor()
+            cursor.execute(
+                "DELETE FROM enrollment WHERE id_enrollment = ? AND fk_person_id = ?",
+                (id_enrollment, id_person),
+            )
+            conexao.commit()
+            if cursor.rowcount > 0:
+                print(f"Inscrição {id_enrollment} removida.")
+                return True
+            return False
+    except sqlite3.Error as erro:
+        print(f"Erro ao remover inscrição {id_enrollment}: {erro}")
+        return False
+
+
 def create_enrollment(id_person, subscrition):
     # Salva uma inscrição
     try:

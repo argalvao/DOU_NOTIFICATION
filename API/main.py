@@ -21,7 +21,8 @@ while True:
     clear_screen()
 
     print(f"###### NOTIFICAÇÕES DO DOU ######")
-    print("API disponível em http://127.0.0.1:8000\n")
+    print("Interface web: http://127.0.0.1:8000")
+    print("API:           http://127.0.0.1:8000/api/health\n")
 
     if session:
         print(f"Usuário logado: {session['nome']}\n")

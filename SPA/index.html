@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DOU Notificações – Acompanhe resultados de concursos</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-container">
+      <a class="nav-brand" href="#home">
+        <span class="brand-icon">📋</span>
+        <span>DOU<strong>Notificações</strong></span>
+      </a>
+
+      <button class="nav-toggle" id="nav-toggle" aria-label="Abrir menu">
+        <span></span><span></span><span></span>
+      </button>
+
+      <ul class="nav-links" id="nav-links">
+        <li><a href="#home" data-page="home">Início</a></li>
+        <li class="nav-auth-off"><a href="#login" data-page="login">Entrar</a></li>
+        <li class="nav-auth-off"><a href="#register" data-page="register">Cadastrar</a></li>
+        <li class="nav-auth-on hidden"><a href="#enrollment" data-page="enrollment">Inscrição</a></li>
+        <li class="nav-auth-on hidden"><a href="#query" data-page="query">Consulta</a></li>
+        <li class="nav-auth-on hidden"><a href="#results" data-page="results">Resultados</a></li>
+        <li class="nav-auth-on hidden">
+          <button class="btn-logout" id="btn-logout">Sair</button>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ===== TOAST ===== -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ===== APP (renderizado via JS) ===== -->
+  <main id="app"></main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>DOU Notificações &copy; 2026 · EXA618</span>
+      <span>Dados provenientes do <a href="https://www.in.gov.br" target="_blank" rel="noopener">Portal do DOU</a></span>
+    </div>
+  </footer>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
+
