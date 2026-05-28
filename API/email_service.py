@@ -15,6 +15,7 @@ import smtplib
 import threading
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import parseaddr
 
 
 def _cfg(key, default=''):
@@ -149,6 +150,12 @@ def _send(to_email: str, nome: str, new_items: list, is_manual: bool):
     passwd = _cfg('SMTP_PASS')
     from_  = _cfg('SMTP_FROM', f'DOU Notificações <{user}>')
 
+    # Extrai apenas o e-mail do campo FROM (ex.: "Nome <email@exemplo.com>" → "email@exemplo.com")
+    # O envelope sender do SMTP deve ser o mesmo e-mail verificado no Brevo
+    _, from_email = parseaddr(from_)
+    if not from_email:
+        from_email = user
+
     msg = MIMEMultipart('alternative')
     msg['Subject'] = f'[DOU] {len(new_items)} novo(s) resultado(s) encontrado(s)'
     msg['From']    = from_
@@ -162,7 +169,7 @@ def _send(to_email: str, nome: str, new_items: list, is_manual: bool):
             server.ehlo()
             server.starttls()
             server.login(user, passwd)
-            server.sendmail(user, to_email, msg.as_string())
+            server.sendmail(from_email, to_email, msg.as_string())
         print(f'[EMAIL] Notificação enviada para {to_email} ({len(new_items)} resultado(s)).')
     except Exception as exc:
         print(f'[EMAIL] Falha ao enviar para {to_email}: {exc}')
