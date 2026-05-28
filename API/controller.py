@@ -24,6 +24,22 @@ else:
     DB_PATH = BASE_DIR / 'DB' / 'database.db'
     DOWNLOAD_PATH = BASE_DIR / 'DB' / 'DOWNLOAD'
 
+
+class _Row(dict):
+    """
+    Row universal: suporta acesso por chave (row['nome']) e por índice (row[0]).
+    Compatível com sqlite3 e libsql-experimental (Turso).
+    """
+    def __init__(self, cursor, row):
+        cols = [d[0] for d in cursor.description]
+        super().__init__(zip(cols, row))
+        self._values = row
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._values[key]
+        return super().__getitem__(key)
+
 SCHEMA_SQL = '''
 CREATE TABLE IF NOT EXISTS person (
     id_person INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,12 +86,27 @@ _dou_xml_cache = {}
 
 
 def get_connection():
-    # Abre conexão com o banco
+    """
+    Retorna uma conexão com o banco de dados.
+    - Localmente: SQLite no caminho padrão.
+    - Vercel com TURSO_DATABASE_URL: libsql remoto (Turso) — dados persistentes.
+    - Vercel sem TURSO_DATABASE_URL: SQLite em /tmp (efêmero, fallback).
+    """
+    turso_url = os.environ.get('TURSO_DATABASE_URL')
+    if turso_url:
+        import libsql_experimental as libsql
+        conn = libsql.connect(
+            turso_url,
+            auth_token=os.environ.get('TURSO_AUTH_TOKEN', ''),
+        )
+        conn.row_factory = _Row
+        return conn
+
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DB_PATH)
-    connection.row_factory = sqlite3.Row
-    connection.execute('PRAGMA foreign_keys = ON')
-    return connection
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = _Row
+    conn.execute('PRAGMA foreign_keys = ON')
+    return conn
 
 
 def initialize_database():
