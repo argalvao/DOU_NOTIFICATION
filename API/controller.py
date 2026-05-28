@@ -55,6 +55,10 @@ class _TursoCursor:
     def lastrowid(self):
         return self._cur.lastrowid
 
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
     def execute(self, sql, params=()):
         if isinstance(params, list):
             params = tuple(params)
