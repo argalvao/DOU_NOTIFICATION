@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import unicodedata
 import hashlib
@@ -10,11 +11,17 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from bs4 import BeautifulSoup
 from service import *
+from email_service import send_results_notification
 
-# Caminho do banco
+# Caminhos — no Vercel o filesystem é somente-leitura exceto /tmp
 BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / 'DB' / 'database.db'
-DOWNLOAD_PATH = BASE_DIR / 'DB' / 'DOWNLOAD'
+_ON_VERCEL = bool(os.environ.get('VERCEL'))
+if _ON_VERCEL:
+    DB_PATH = Path('/tmp') / 'database.db'
+    DOWNLOAD_PATH = Path('/tmp') / 'DOWNLOAD'
+else:
+    DB_PATH = BASE_DIR / 'DB' / 'database.db'
+    DOWNLOAD_PATH = BASE_DIR / 'DB' / 'DOWNLOAD'
 
 SCHEMA_SQL = '''
 CREATE TABLE IF NOT EXISTS person (
@@ -654,7 +661,7 @@ def create_enrollment(id_person, subscrition):
         print(f"Erro ao matricular pessoa com ID {id_person} inscrição {subscrition}: {erro}")
         return None
 
-def search_dou(id_person, verbose=True, extracted_items=None):
+def search_dou(id_person, verbose=True, extracted_items=None, is_manual=None):
     # Busca resultados no DOU
     try:
         with get_connection() as conexao:
@@ -721,6 +728,7 @@ def search_dou(id_person, verbose=True, extracted_items=None):
             with get_connection() as conexao:
                 cursor = conexao.cursor()
                 salvos = 0
+                novos_itens = []
                 for i, item in enumerate(fila, 1):
                     if verbose:
                         print(f"\n[{i}] {item.get('title', 'Sem título')}")
@@ -743,11 +751,36 @@ def search_dou(id_person, verbose=True, extracted_items=None):
                             (dou_result, id_person)
                         )
                         salvos += 1
+                        novos_itens.append(item)
                 conexao.commit()
             if verbose:
                 print(f"\n{salvos} novo(s) resultado(s) salvo(s) no banco.")
             else:
                 print(f"[AUTO] Usuário {id_person}: {len(fila)} resultado(s), {salvos} novo(s) salvo(s).")
+
+            # Notificação por e-mail
+            # - Busca manual:    envia com todos os resultados encontrados
+            # - Rotina automática: envia apenas quando há resultados novos
+            manual = is_manual if is_manual is not None else verbose
+            itens_email = fila if manual else novos_itens
+            if itens_email:
+                try:
+                    with get_connection() as conexao:
+                        cursor = conexao.cursor()
+                        cursor.execute(
+                            "SELECT p.email, p.nome FROM person p WHERE p.id_person = ?",
+                            (id_person,)
+                        )
+                        row = cursor.fetchone()
+                    if row and row[0]:
+                        send_results_notification(
+                            to_email=row[0],
+                            nome=row[1],
+                            new_items=itens_email,
+                            is_manual=manual,
+                        )
+                except Exception as exc:
+                    print(f"[EMAIL] Erro ao preparar notificação: {exc}")
 
     except sqlite3.Error as erro:
         print(f"Erro ao buscar no DOU: {erro}")

@@ -1,0 +1,18 @@
+# Exclui arquivos grandes e desnecessários do build do Vercel
+
+# Banco de dados local
+DB/database.db
+
+# XMLs baixados do DOU (podem ser centenas de MBs)
+DB/DOWNLOAD/
+
+# Ambiente virtual Python
+.venv/
+
+# Cache Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Variáveis de ambiente (nunca enviar ao Vercel via build)
+.env
