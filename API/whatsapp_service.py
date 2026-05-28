@@ -14,6 +14,7 @@ O código de país 55 é adicionado automaticamente quando ausente.
 import os
 import re
 import threading
+from datetime import datetime
 import requests
 
 
@@ -50,9 +51,10 @@ def _build_message(nome: str, items: list, is_manual: bool) -> str:
     origin = 'busca manual' if is_manual else 'rotina automática diária'
     total = len(items)
     label = 'resultado' if total == 1 else 'resultados'
+    timestamp = datetime.now().strftime('%d/%m/%Y às %H:%M')
 
     lines = [
-        f'*📋 DOU Notificações*',
+        f'*📋 DOU Notificações* — {timestamp}',
         f'Olá, *{nome}*!',
         f'',
         f'{"📌" if is_manual else "🔔"} {total} {label} encontrado(s) via *{origin}*.',
