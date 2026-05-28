@@ -865,6 +865,7 @@ def search_dou(id_person, verbose=True, extracted_items=None, is_manual=None):
             # - Rotina automática: envia apenas quando há resultados novos
             manual = is_manual if is_manual is not None else verbose
             itens_email = fila if manual else novos_itens
+            print(f"[NOTIFY] manual={manual} fila={len(fila)} novos={len(novos_itens)} itens_email={len(itens_email)}")
             if itens_email:
                 try:
                     with get_connection() as conexao:
@@ -874,23 +875,34 @@ def search_dou(id_person, verbose=True, extracted_items=None, is_manual=None):
                             (id_person,)
                         )
                         row = cursor.fetchone()
+                    print(f"[NOTIFY] row={row!r}")
                     if row:
-                        if row[0]:
+                        email_val = row[0]
+                        nome_val  = row[1]
+                        fone_val  = row[2]
+                        print(f"[NOTIFY] email={email_val!r} fone={fone_val!r}")
+                        if email_val:
                             send_results_notification(
-                                to_email=row[0],
-                                nome=row[1],
+                                to_email=email_val,
+                                nome=nome_val,
                                 new_items=itens_email,
                                 is_manual=manual,
                             )
-                        if row[2]:
+                        if fone_val:
                             send_whatsapp_notification(
-                                telefone=row[2],
-                                nome=row[1],
+                                telefone=fone_val,
+                                nome=nome_val,
                                 items=itens_email,
                                 is_manual=manual,
                             )
+                    else:
+                        print(f"[NOTIFY] Pessoa {id_person} não encontrada no banco.")
                 except Exception as exc:
+                    import traceback
                     print(f"[NOTIFY] Erro ao preparar notificação: {exc}")
+                    print(traceback.format_exc())
+            else:
+                print(f"[NOTIFY] Sem itens para notificar (fila vazia).")
 
     except sqlite3.Error as erro:
         print(f"Erro ao buscar no DOU: {erro}")
