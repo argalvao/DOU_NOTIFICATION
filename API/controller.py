@@ -56,11 +56,13 @@ class _TursoCursor:
         return self._cur.lastrowid
 
     def execute(self, sql, params=()):
+        if isinstance(params, list):
+            params = tuple(params)
         self._cur.execute(sql, params)
         return self
 
     def executemany(self, sql, seq):
-        self._cur.executemany(sql, seq)
+        self._cur.executemany(sql, [tuple(p) if isinstance(p, list) else p for p in seq])
         return self
 
     def fetchone(self):
@@ -685,7 +687,7 @@ def edit_person(id_person, nome=None, telefone=None, email=None, password=None):
             params.append(id_person)
             sql = f"UPDATE person SET {', '.join(updates)} WHERE id_person = ?"
 
-            cursor.execute(sql, tuple(params))
+            cursor.execute(sql, params)
             conexao.commit()
 
             if cursor.rowcount > 0:
