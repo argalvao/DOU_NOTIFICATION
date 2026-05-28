@@ -3,6 +3,9 @@ import socket
 import threading
 from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / '.env')
+
 from flask import Flask, jsonify, request, send_from_directory
 
 from controller import (
@@ -20,6 +23,7 @@ from controller import (
     list_results_by_person,
     login_user,
     search_dou,
+    _notify_person,
 )
 
 
@@ -269,7 +273,9 @@ def post_search(person_id):
     if error:
         return error
 
-    search_dou(person_id, verbose=False)
+    fila, _ = search_dou(person_id, verbose=False)
+    # Notifica com TODOS os resultados encontrados (busca manual)
+    _notify_person(person_id, fila, is_manual=True)
     results = list_results_by_person(person_id)
 
     return jsonify({

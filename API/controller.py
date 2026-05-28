@@ -367,6 +367,32 @@ def _search_dou_in_extracted_files(variacoes, inscricoes, extracted_items=None):
     return items
 
 
+def _notify_person(id_person, items, is_manual):
+    """Envia notificações (e-mail + WhatsApp) para a pessoa com os itens fornecidos."""
+    if not items:
+        return
+    try:
+        with get_connection() as conexao:
+            cursor = conexao.cursor()
+            cursor.execute(
+                "SELECT p.email, p.nome, p.telefone FROM person p WHERE p.id_person = ?",
+                (id_person,)
+            )
+            row = cursor.fetchone()
+        if not row:
+            print(f"[NOTIFY] Pessoa {id_person} não encontrada no banco.")
+            return
+        email_val, nome_val, fone_val = row[0], row[1], row[2]
+        print(f"[NOTIFY] person={id_person} manual={is_manual} itens={len(items)} email={email_val!r} fone={fone_val!r}")
+        if email_val:
+            send_results_notification(to_email=email_val, nome=nome_val, new_items=items, is_manual=is_manual)
+        if fone_val:
+            send_whatsapp_notification(telefone=fone_val, nome=nome_val, items=items, is_manual=is_manual)
+    except Exception as exc:
+        import traceback
+        print(f"[NOTIFY] Erro: {exc}\n{traceback.format_exc()}")
+
+
 def search_dou_all(verbose=True):
     # Executa a busca no DOU para todas as pessoas cadastradas
     try:
@@ -385,7 +411,9 @@ def search_dou_all(verbose=True):
         if verbose:
             print("Iniciando busca automática no DOU para todos os usuários...")
         for person_id in person_ids:
-            search_dou(person_id, verbose=verbose, extracted_items=extracted_items)
+            _, novos_itens = search_dou(person_id, verbose=verbose, extracted_items=extracted_items)
+            # Notifica apenas quando há resultados novos (rotina automática)
+            _notify_person(person_id, novos_itens, is_manual=False)
 
         if not verbose:
             print(f"[AUTO] Busca automática concluída para {len(person_ids)} usuário(s).")
@@ -763,8 +791,15 @@ def create_enrollment(id_person, subscrition):
         print(f"Erro ao matricular pessoa com ID {id_person} inscrição {subscrition}: {erro}")
         return None
 
-def search_dou(id_person, verbose=True, extracted_items=None, is_manual=None):
-    # Busca resultados no DOU
+def search_dou(id_person, verbose=True, extracted_items=None):
+    """
+    Busca resultados no DOU para a pessoa informada.
+    Retorna (fila, novos_itens):
+      - fila:       todos os resultados encontrados nesta busca
+      - novos_itens: apenas os que não estavam no banco antes desta busca
+    """
+    fila = []
+    novos_itens = []
     try:
         with get_connection() as conexao:
             cursor = conexao.cursor()
@@ -784,12 +819,11 @@ def search_dou(id_person, verbose=True, extracted_items=None, is_manual=None):
         if not variacoes and not inscricoes:
             if verbose:
                 print("Nenhuma variação de nome ou inscrição cadastrada para busca.")
-            return
+            return fila, novos_itens
 
         if verbose:
             print("Buscando no DOU, aguarde...")
 
-        fila = []
         vistos = set()
 
         for variacao in variacoes:
@@ -830,7 +864,6 @@ def search_dou(id_person, verbose=True, extracted_items=None, is_manual=None):
             with get_connection() as conexao:
                 cursor = conexao.cursor()
                 salvos = 0
-                novos_itens = []
                 for i, item in enumerate(fila, 1):
                     if verbose:
                         print(f"\n[{i}] {item.get('title', 'Sem título')}")
@@ -860,50 +893,8 @@ def search_dou(id_person, verbose=True, extracted_items=None, is_manual=None):
             else:
                 print(f"[AUTO] Usuário {id_person}: {len(fila)} resultado(s), {salvos} novo(s) salvo(s).")
 
-            # Notificação por e-mail
-            # - Busca manual:    envia com todos os resultados encontrados
-            # - Rotina automática: envia apenas quando há resultados novos
-            manual = is_manual if is_manual is not None else verbose
-            itens_email = fila if manual else novos_itens
-            print(f"[NOTIFY] manual={manual} fila={len(fila)} novos={len(novos_itens)} itens_email={len(itens_email)}")
-            if itens_email:
-                try:
-                    with get_connection() as conexao:
-                        cursor = conexao.cursor()
-                        cursor.execute(
-                            "SELECT p.email, p.nome, p.telefone FROM person p WHERE p.id_person = ?",
-                            (id_person,)
-                        )
-                        row = cursor.fetchone()
-                    print(f"[NOTIFY] row={row!r}")
-                    if row:
-                        email_val = row[0]
-                        nome_val  = row[1]
-                        fone_val  = row[2]
-                        print(f"[NOTIFY] email={email_val!r} fone={fone_val!r}")
-                        if email_val:
-                            send_results_notification(
-                                to_email=email_val,
-                                nome=nome_val,
-                                new_items=itens_email,
-                                is_manual=manual,
-                            )
-                        if fone_val:
-                            send_whatsapp_notification(
-                                telefone=fone_val,
-                                nome=nome_val,
-                                items=itens_email,
-                                is_manual=manual,
-                            )
-                    else:
-                        print(f"[NOTIFY] Pessoa {id_person} não encontrada no banco.")
-                except Exception as exc:
-                    import traceback
-                    print(f"[NOTIFY] Erro ao preparar notificação: {exc}")
-                    print(traceback.format_exc())
-            else:
-                print(f"[NOTIFY] Sem itens para notificar (fila vazia).")
-
     except sqlite3.Error as erro:
         print(f"Erro ao buscar no DOU: {erro}")
+
+    return fila, novos_itens
 
