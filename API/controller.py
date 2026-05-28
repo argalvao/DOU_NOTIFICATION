@@ -30,8 +30,8 @@ class _Row(dict):
     Row universal: suporta acesso por chave (row['nome']) e por índice (row[0]).
     Compatível com sqlite3 e libsql-experimental (Turso).
     """
-    def __init__(self, cursor, row):
-        cols = [d[0] for d in cursor.description]
+    def __init__(self, description, row):
+        cols = [d[0] for d in description]
         super().__init__(zip(cols, row))
         self._values = row
 
@@ -39,6 +39,77 @@ class _Row(dict):
         if isinstance(key, int):
             return self._values[key]
         return super().__getitem__(key)
+
+
+class _TursoCursor:
+    """Cursor wrapper sobre libsql que aplica _Row a todos os resultados."""
+
+    def __init__(self, cur):
+        self._cur = cur
+
+    @property
+    def description(self):
+        return self._cur.description
+
+    @property
+    def lastrowid(self):
+        return self._cur.lastrowid
+
+    def execute(self, sql, params=()):
+        self._cur.execute(sql, params)
+        return self
+
+    def executemany(self, sql, seq):
+        self._cur.executemany(sql, seq)
+        return self
+
+    def fetchone(self):
+        row = self._cur.fetchone()
+        if row is None:
+            return None
+        return _Row(self._cur.description or [], row)
+
+    def fetchall(self):
+        desc = self._cur.description or []
+        return [_Row(desc, row) for row in self._cur.fetchall()]
+
+    def __iter__(self):
+        desc = self._cur.description or []
+        for row in self._cur:
+            yield _Row(desc, row)
+
+
+class _TursoConnection:
+    """Connection wrapper sobre libsql que expõe a mesma interface do sqlite3."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def cursor(self):
+        return _TursoCursor(self._conn.cursor())
+
+    def execute(self, sql, params=()):
+        return _TursoCursor(self._conn.execute(sql, params))
+
+    def executescript(self, sql):
+        for stmt in sql.split(';'):
+            stmt = stmt.strip()
+            if stmt:
+                self._conn.execute(stmt)
+        self._conn.commit()
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, *_):
+        if exc_type is None:
+            self.commit()
 
 SCHEMA_SQL = '''
 CREATE TABLE IF NOT EXISTS person (
@@ -89,22 +160,21 @@ def get_connection():
     """
     Retorna uma conexão com o banco de dados.
     - Localmente: SQLite no caminho padrão.
-    - Vercel com TURSO_DATABASE_URL: libsql remoto (Turso) — dados persistentes.
-    - Vercel sem TURSO_DATABASE_URL: SQLite em /tmp (efêmero, fallback).
+    - Com TURSO_DATABASE_URL: libsql remoto (Turso) — dados persistentes.
+    - Vercel sem Turso: SQLite em /tmp (efêmero, fallback).
     """
     turso_url = os.environ.get('TURSO_DATABASE_URL')
     if turso_url:
         import libsql_experimental as libsql
-        conn = libsql.connect(
+        raw = libsql.connect(
             turso_url,
             auth_token=os.environ.get('TURSO_AUTH_TOKEN', ''),
         )
-        conn.row_factory = _Row
-        return conn
+        return _TursoConnection(raw)
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = _Row
+    conn.row_factory = lambda cur, row: _Row(cur.description, row)
     conn.execute('PRAGMA foreign_keys = ON')
     return conn
 
