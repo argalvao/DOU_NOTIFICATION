@@ -179,9 +179,14 @@ def send_results_notification(to_email: str, nome: str, new_items: list, is_manu
     """
     if not new_items:
         return
-    threading.Thread(
-        target=_send,
-        args=(to_email, nome, new_items, is_manual),
-        daemon=True,
-        name=f'email-{to_email}',
-    ).start()
+    # No Vercel o processo é congelado após responder — threads daemon são mortas
+    # antes de concluir. Executa sincronamente no Vercel.
+    if os.environ.get('VERCEL'):
+        _send(to_email, nome, new_items, is_manual)
+    else:
+        threading.Thread(
+            target=_send,
+            args=(to_email, nome, new_items, is_manual),
+            daemon=True,
+            name=f'email-{to_email}',
+        ).start()

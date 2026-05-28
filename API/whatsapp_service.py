@@ -124,9 +124,14 @@ def send_whatsapp_notification(telefone: str, nome: str, items: list, is_manual:
     if not items or not _is_configured():
         return
 
-    threading.Thread(
-        target=_send,
-        args=(telefone, nome, items, is_manual),
-        daemon=True,
-        name=f'whatsapp-{telefone}',
-    ).start()
+    # No Vercel o processo é congelado após responder — threads daemon são mortas
+    # antes de concluir. Executa sincronamente no Vercel.
+    if os.environ.get('VERCEL'):
+        _send(telefone, nome, items, is_manual)
+    else:
+        threading.Thread(
+            target=_send,
+            args=(telefone, nome, items, is_manual),
+            daemon=True,
+            name=f'whatsapp-{telefone}',
+        ).start()
