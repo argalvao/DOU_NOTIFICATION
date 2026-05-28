@@ -9,7 +9,7 @@
 import { Session } from './session.js';
 import { Toast }   from './toast.js';
 
-const PROTECTED  = new Set(['enrollment', 'query', 'results']);
+const PROTECTED  = new Set(['enrollment', 'query', 'results', 'profile']);
 const GUEST_ONLY = new Set(['login', 'register']);
 
 /** @type {Record<string, { template(): string, init?(): void }>} */

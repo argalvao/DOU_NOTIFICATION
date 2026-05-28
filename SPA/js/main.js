@@ -14,6 +14,7 @@ import { register }   from './pages/register.js';
 import { enrollment } from './pages/enrollment.js';
 import { query }      from './pages/query.js';
 import { results }    from './pages/results.js';
+import { profile }    from './pages/profile.js';
 
 // Registra as páginas no router
 registerPage('home',       home);
@@ -22,6 +23,7 @@ registerPage('register',   register);
 registerPage('enrollment', enrollment);
 registerPage('query',      query);
 registerPage('results',    results);
+registerPage('profile',    profile);
 
 // Bootstrap após carregamento do DOM
 document.addEventListener('DOMContentLoaded', () => {

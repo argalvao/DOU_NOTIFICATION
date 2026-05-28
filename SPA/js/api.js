@@ -45,6 +45,9 @@ export const Api = {
   getPerson: (id) =>
     request('GET', `/api/persons/${id}`),
 
+  updatePerson: (id, data) =>
+    request('PUT', `/api/persons/${id}`, data),
+
   /* Inscrições */
   getEnrollments: (personId) =>
     request('GET', `/api/persons/${personId}/enrollments`),
